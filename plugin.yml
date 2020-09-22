@@ -1,0 +1,23 @@
+name: RawStats
+main: org.slabserver.plugin.rawstats.RawStats
+version: 0.0.1-SNAPSHOT
+api-version: 1.15
+commands:
+  statistics:
+    description: Displays a vanilla statistic on the sidebar.
+    usage: /statistics <type> [item/entity]
+    permission: rawstats.statistics
+    permission-message: You don't have permission rawstats.statistics
+  objective:
+    description: Lists scores in an objective.
+    usage: /objective <objective>
+    permission: rawstats.objective
+    permission-message: You don't have permission rawstats.objective
+
+permissions:
+  rawstats.statistics:
+    description: Allows you to display server statistics using /statistics.
+    default: op
+  rawstats.objective:
+    description: Allows you to display objective score data using /objective.
+    default: op
