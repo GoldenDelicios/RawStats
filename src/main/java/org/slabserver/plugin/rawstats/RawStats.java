@@ -1,10 +1,7 @@
 package org.slabserver.plugin.rawstats;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,9 +11,9 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.Statistic;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -40,31 +37,15 @@ public class RawStats extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
+		this.getServer().getPluginManager().registerEvents(this, this);
+		
 		playerNames = new HashMap<>();
 		for (OfflinePlayer player : Bukkit.getOfflinePlayers()) {
 			playerNames.put(player.getUniqueId(), player.getName());
 		}
 		
-		this.getCommand("statistics").setTabCompleter(new TabComplete());
-		this.getCommand("objective").setTabCompleter(new TabCompleter() {
-			@Override
-			public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-				if (args.length > 1)
-					return Collections.emptyList();
-				
-				List<String> names = new ArrayList<>();
-				for (Objective obj : Bukkit.getScoreboardManager().getMainScoreboard().getObjectives()) {
-					names.add(obj.getName());
-				}
-				
-				if (!args[0].isEmpty()) {
-					String prefix = args[0].toLowerCase();
-					names.removeIf(name -> !name.toLowerCase().startsWith(prefix));
-				}
-				names.sort(String.CASE_INSENSITIVE_ORDER);
-				return names;
-			}
-		});
+		this.getCommand("statistics").setTabCompleter(new StatComplete());
+		this.getCommand("objective").setTabCompleter(new ObjComplete());
 	}
 
 	@Override
@@ -72,73 +53,76 @@ public class RawStats extends JavaPlugin implements Listener {
 		
 	}
 	
+	@EventHandler
 	public void onPlayerJoin(PlayerJoinEvent event) {
 		Player player = event.getPlayer();
 		playerNames.put(player.getUniqueId(), player.getName());
 	}
 	
+	public Objective emptyObjective() {
+		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+		Objective statistics = scoreboard.getObjective("Statistics");
+		if (statistics != null)
+			statistics.unregister();
+		return scoreboard.registerNewObjective("Statistics", "dummy", "Statistics");
+	}
+	
+	public static String displayName(Enum<?>... enums) {
+		StringBuilder s = new StringBuilder();
+		for (Enum<?> e : enums) {
+			boolean upper = true;
+			for (char c : e.name().toCharArray()) {
+				if (c == '_')
+					upper = true;
+				else if (upper) {
+					s.append(c);
+					upper = false;
+				}
+				else
+					s.append(Character.toLowerCase(c));
+			}
+		}
+		
+		return s.toString();
+	}
+	
 	public void getStats(Statistic statistic) {
-		Objective statistics = getObjective();
+		Objective statistics = emptyObjective();
 		playerNames.forEach((uuid, name) -> {
 			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 			int count = player.getStatistic(statistic);
 			statistics.getScore(name).setScore(count);
 		});
 		
-		String displayName = displayName(statistic.name());
+		String displayName = displayName(statistic);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
 	}
 	
 	public void getStats(Statistic statistic, Material material) {
-		Objective statistics = getObjective();
+		Objective statistics = emptyObjective();
 		playerNames.forEach((uuid, name) -> {
 			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 			int count = player.getStatistic(statistic, material);
 			statistics.getScore(name).setScore(count);
 		});
 		
-		String displayName = displayName(statistic.name() + '_' + material.name());
+		String displayName = displayName(statistic, material);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
 	}
 	
 	public void getStats(Statistic statistic, EntityType entity) {
-		Objective statistics = getObjective();
+		Objective statistics = emptyObjective();
 		playerNames.forEach((uuid, name) -> {
 			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 			int count = player.getStatistic(statistic, entity);
 			statistics.getScore(name).setScore(count);
 		});
 		
-		String displayName = displayName(statistic.name() + '_' + entity.name());
+		String displayName = displayName(statistic, entity);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
-	}
-	
-	public static String displayName(String name) {
-		StringBuilder s = new StringBuilder();
-		boolean upper = true;
-		for (char c : name.toCharArray()) {
-			if (c == '_')
-				upper = true;
-			else if (upper) {
-				s.append(c);
-				upper = false;
-			}
-			else {
-				s.append(Character.toLowerCase(c));
-			}
-		}
-		return s.toString();
-	}
-	
-	public Objective getObjective() {
-		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
-		Objective statistics = scoreboard.getObjective("Statistics");
-		if (statistics != null)
-			statistics.unregister();
-		return scoreboard.registerNewObjective("Statistics", "dummy", "Statistics");
 	}
 	
 	public String getScores(String objectiveName) {
@@ -177,7 +161,6 @@ public class RawStats extends JavaPlugin implements Listener {
 		}
 		
 		else if (cmd.getName().equals("statistics")) {
-			
 			for (int i = 0; i < args.length; ++i) {
 				args[i] = args[i].toUpperCase();
 			}
