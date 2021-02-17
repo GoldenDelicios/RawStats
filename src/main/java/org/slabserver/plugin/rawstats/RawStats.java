@@ -59,12 +59,104 @@ public class RawStats extends JavaPlugin implements Listener {
 		playerNames.put(player.getUniqueId(), player.getName());
 	}
 	
-	public Objective emptyObjective() {
+	public String getCriteria(Statistic statistic, Material material, EntityType entity) {
+		switch (statistic.getType()) {
+		case BLOCK:
+		case ITEM:
+			if (material == null)
+				throw new IllegalArgumentException();
+			break;
+		case ENTITY:
+			if (entity == null)
+				throw new IllegalArgumentException();
+			break;
+		default:
+			break;
+		}
+		
+		switch (statistic) {
+		case ARMOR_CLEANED:
+			return "minecraft.custom:minecraft.clean_armor";
+		case BANNER_CLEANED:
+			return "minecraft.custom:minecraft.clean_banner";
+		case BEACON_INTERACTION:
+			return "minecraft.custom:minecraft.interact_with_beacon";
+		case BREAK_ITEM:
+			return "minecraft.broken:minecraft." + material.name().toLowerCase();
+		case BREWINGSTAND_INTERACTION:
+			return "minecraft.custom:minecraft.interact_with_brewingstand";
+		case CAKE_SLICES_EATEN:
+			return "minecraft.custom:minecraft.eat_cake_slice";
+		case CAULDRON_FILLED:
+			return "minecraft.custom:minecraft.fill_cauldron";
+		case CAULDRON_USED:
+			return "minecraft.custom:minecraft.use_cauldron";
+		case CHEST_OPENED:
+			return "minecraft.custom:minecraft.open_chest";
+		case CRAFTING_TABLE_INTERACTION:
+			return "minecraft.custom:minecraft.interact_with_crafting_table";
+		case CRAFT_ITEM:
+			return "minecraft.crafted:minecraft." + material.name().toLowerCase();
+		case DISPENSER_INSPECTED:
+			return "minecraft.custom:minecraft.inspect_dispenser";
+		case DROP:
+			return "minecraft.dropped:minecraft." + material.name().toLowerCase();
+		case DROPPER_INSPECTED:
+			return "minecraft.custom:minecraft.inspect_dropper";
+		case DROP_COUNT:
+			return "minecraft.custom:minecraft.drop";
+		case ENDERCHEST_OPENED:
+			return "minecraft.custom:minecraft.open_enderchest";
+		case ENTITY_KILLED_BY:
+			return "minecraft.killed_by:minecraft." + entity.name().toLowerCase();
+		case FLOWER_POTTED:
+			return "minecraft.custom:minecraft.pot_flower";
+		case FURNACE_INTERACTION:
+			return "minecraft.custom:minecraft.interact_with_furnace";
+		case HOPPER_INSPECTED:
+			return "minecraft.custom:minecraft.inspect_hopper";
+		case ITEM_ENCHANTED:
+			return "minecraft.custom:minecraft.enchant_item";
+		case KILL_ENTITY:
+			return "minecraft.killed:minecraft." + entity.name().toLowerCase();
+		case MINE_BLOCK:
+			return "minecraft.mined:minecraft." + material.name().toLowerCase();
+		case NOTEBLOCK_PLAYED:
+			return "minecraft.custom:minecraft.play_noteblock";
+		case NOTEBLOCK_TUNED:
+			return "minecraft.custom:minecraft.tune_noteblock";
+		case PICKUP:
+			return "minecraft.picked_up:minecraft." + material.name().toLowerCase();
+		case RECORD_PLAYED:
+			return "minecraft.custom:minecraft.play_record";
+		case SHULKER_BOX_OPENED:
+			return "minecraft.custom:minecraft.open_shulker_box";
+		case TRAPPED_CHEST_TRIGGERED:
+			return "minecraft.custom:minecraft.trigger_trapped_chest";
+		case USE_ITEM:
+			return "minecraft.used:minecraft." + material.name().toLowerCase();
+		default:
+			return "minecraft.custom:minecraft." + statistic.name().toLowerCase();
+		}
+	}
+	
+	public Objective emptyObjective(Statistic statistic, Material material, EntityType entity) {
 		Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
 		Objective statistics = scoreboard.getObjective("Statistics");
 		if (statistics != null)
 			statistics.unregister();
-		return scoreboard.registerNewObjective("Statistics", "dummy", "Statistics");
+		
+		String criteria = getCriteria(statistic, material, entity);
+		this.getLogger().info(criteria);
+		this.getServer().dispatchCommand(getServer().getConsoleSender(), 
+				"scoreboard objectives add Statistics " + criteria);
+		
+		statistics = scoreboard.getObjective("Statistics");
+		if (statistics == null) {
+			this.getLogger().info("Could not get objective normally, trying again. Criteria may have been invalid.");
+			statistics = scoreboard.registerNewObjective("Statistics", criteria, "Statistics");
+		}
+		return statistics;
 	}
 	
 	public static String displayName(Enum<?>... enums) {
@@ -87,42 +179,48 @@ public class RawStats extends JavaPlugin implements Listener {
 	}
 	
 	public void getStats(Statistic statistic) {
-		Objective statistics = emptyObjective();
-		playerNames.forEach((uuid, name) -> {
-			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-			int count = player.getStatistic(statistic);
-			statistics.getScore(name).setScore(count);
-		});
-		
+		Objective statistics = emptyObjective(statistic, null, null);
 		String displayName = displayName(statistic);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
+		
+		async(() -> {
+			playerNames.forEach((uuid, name) -> {
+				OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+				int count = player.getStatistic(statistic);
+				statistics.getScore(name).setScore(count);
+			});
+		});
 	}
 	
 	public void getStats(Statistic statistic, Material material) {
-		Objective statistics = emptyObjective();
-		playerNames.forEach((uuid, name) -> {
-			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-			int count = player.getStatistic(statistic, material);
-			statistics.getScore(name).setScore(count);
-		});
-		
+		Objective statistics = emptyObjective(statistic, material, null);
 		String displayName = displayName(statistic, material);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
+		
+		async(() -> {
+			playerNames.forEach((uuid, name) -> {
+				OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+				int count = player.getStatistic(statistic, material);
+				statistics.getScore(name).setScore(count);
+			});
+		});
 	}
 	
 	public void getStats(Statistic statistic, EntityType entity) {
-		Objective statistics = emptyObjective();
-		playerNames.forEach((uuid, name) -> {
-			OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-			int count = player.getStatistic(statistic, entity);
-			statistics.getScore(name).setScore(count);
-		});
-		
+		Objective statistics = emptyObjective(statistic, null, entity);
 		String displayName = displayName(statistic, entity);
 		statistics.setDisplayName(displayName);
 		statistics.setDisplaySlot(DisplaySlot.SIDEBAR);
+		
+		async(() -> {
+			playerNames.forEach((uuid, name) -> {
+				OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+				int count = player.getStatistic(statistic, entity);
+				statistics.getScore(name).setScore(count);
+			});
+		});
 	}
 	
 	public String getScores(String objectiveName) {
@@ -165,6 +263,9 @@ public class RawStats extends JavaPlugin implements Listener {
 				args[i] = args[i].toUpperCase();
 			}
 			
+			Statistic statistic = null;
+			Material material = null;
+			EntityType entity = null;
 			try {
 				if (args.length == 0) {
 					Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
@@ -175,27 +276,23 @@ public class RawStats extends JavaPlugin implements Listener {
 						statistics.setDisplaySlot(null);
 				}
 				else if (args.length == 1) {
-					Statistic statistic = Statistic.valueOf(args[0]);
-					async(() -> getStats(statistic));
+					statistic = Statistic.valueOf(args[0]);
+					getStats(statistic);
 				}
 				else if (args.length == 2) {
-					Statistic statistic = Statistic.valueOf(args[0]);
-					Material material;
+					statistic = Statistic.valueOf(args[0]);
 					switch (statistic.getType()) {
 					case BLOCK:
-						material = Material.valueOf(args[1]);
-						async(() -> getStats(statistic, material));
-						break;
-					case ENTITY:
-						EntityType entity = EntityType.valueOf(args[1]);
-						async(() -> getStats(statistic, entity));
-						break;
 					case ITEM:
 						material = Material.valueOf(args[1]);
-						async(() -> getStats(statistic, material));
+						getStats(statistic, material);
+						break;
+					case ENTITY:
+						entity = EntityType.valueOf(args[1]);
+						getStats(statistic, entity);
 						break;
 					default:
-						sender.sendMessage("Statistic not found");
+						sender.sendMessage("Statistic not found: This is not an item/entity statistic");
 					}
 				}
 				else {
@@ -203,7 +300,8 @@ public class RawStats extends JavaPlugin implements Listener {
 				}
 			}
 			catch (IllegalArgumentException e) {
-				sender.sendMessage("Statistic not found");
+				getLogger().info("statistic=" + statistic + ",material=" + material + ",entity=" + entity);
+				sender.sendMessage("Statistic not found: Statistic is invalid");
 			}
 			return true;
 		}
